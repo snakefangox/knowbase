@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en" data-bs-theme="dark">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}{{ name }}{% endblock title %}</title>
+    <link rel="icon" href="/favicon.svg">
+    <link href="/bootstrap.css" rel="stylesheet">
+    <style>
+        table {
+            margin-bottom: 1rem;
+        }
+
+        td,
+        th {
+            padding-right: 1rem;
+            border-bottom: 1px solid #41464b;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5 {
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="navbar bg-body-tertiary bg-light-subtle shadow-sm mb-5">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-semibold user-select-none" href="/">
+                <img src="/favicon.svg" alt="Logo" width="32" height="32" class="d-inline-block align-text-top">
+                {{ name }}
+            </a>
+            <form class="d-flex" role="search">
+                <input class="form-control me-2" type="search" placeholder="Search" aria-label="Search">
+                <button class="btn btn-outline-success" type="submit">Search</button>
+            </form>
+            <a class="btn btn-outline-danger" href="/upload" role="button">Upload</a>
+        </div>
+    </div>
+    {% block body %}{% endblock body %}
+    <script src="/bootstrap.js"></script>
+</body>
+
+</html>

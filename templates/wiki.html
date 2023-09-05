@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}{{ name }} - {{ title }}{% endblock title %}
+
+{% block body %}
+<main class="container-lg">
+  <div class="row align-items-start">
+    <div class="col shadow-lg px-4">
+      {{ page|safe }}
+    </div>
+  </div>
+</main>
+{% endblock body %}

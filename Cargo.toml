@@ -1,0 +1,17 @@
+[package]
+name = "overmind"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+actix-multipart = "0.6.1"
+actix-session = { version = "0.7.2", features = ["cookie-session"] }
+actix-web = { version = "4.4.0" }
+askama = "0.12.0"
+askama_actix = "0.14.0"
+comrak = "0.18.0"
+redis = { version = "0.23.2", features = ["aio", "async-std-comp", "tokio"] }
+serde = { version = "1.0.188", features = ["derive"] }
+serde_json = "1.0.105"
+tokio = { version = "1.32.0", features = ["full"] }
+zip = "0.6.6"
