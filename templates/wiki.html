@@ -5,8 +5,14 @@
 {% block body %}
 <main class="container-lg">
   <div class="row align-items-start">
+    {% if !page.index.is_empty() %}
+    <div class="col-2">
+      <h2>Index</h2>
+      {{ page.index|safe }}
+    </div>
+    {% endif %}
     <div class="col shadow-lg px-4">
-      {{ page|safe }}
+      {{ page.content|safe }}
     </div>
   </div>
 </main>

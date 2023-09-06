@@ -12,7 +12,7 @@ use actix_web::{
 };
 use askama_actix::Template;
 use serde::Deserialize;
-use state::State;
+use state::{State, Page};
 
 #[derive(Template)]
 #[template(path = "index.html")]
@@ -111,6 +111,7 @@ async fn upload_file(
 
     let mut zip_file =
         zip::ZipArchive::new(payload.zip_file.file.as_file()).map_err(ErrorUnsupportedMediaType)?;
+
     let files: Vec<String> = zip_file.file_names().map(|s| s.to_owned()).collect();
 
     for file_name in &files {
@@ -127,7 +128,7 @@ async fn upload_file(
                 .map_err(ErrorUnsupportedMediaType)?;
 
             state
-                .set_page(&f.enclosed_name().unwrap().to_string_lossy(), &md)
+                .set_page(&f.enclosed_name().unwrap().to_string_lossy(), md)
                 .await;
         }
     }
@@ -144,11 +145,16 @@ async fn upload_file(
 struct WikiTemplate<'a> {
     name: &'a str,
     title: &'a str,
-    page: &'a str,
+    page: &'a Page,
 }
 
 #[get("/w{filepath:.*}")]
-async fn wiki(req: HttpRequest, session: Session, state: Data<State>, path: actix_web::web::Path<String>) -> Result<impl Responder> {
+async fn wiki(
+    req: HttpRequest,
+    session: Session,
+    state: Data<State>,
+    path: actix_web::web::Path<String>,
+) -> Result<impl Responder> {
     let authed = session.get::<bool>("auth")?;
     if authed.is_none() || !authed.unwrap() {
         return Ok(HttpResponse::SeeOther()

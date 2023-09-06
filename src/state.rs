@@ -1,15 +1,28 @@
 use actix_web::cookie::Key;
 use comrak::{
     nodes::{AstNode, NodeValue},
-    Arena, ComrakOptions, ComrakExtensionOptions, ComrakParseOptions, ComrakRenderOptions,
+    Arena, ComrakExtensionOptions, ComrakOptions, ComrakParseOptions, ComrakRenderOptions,
 };
+use lazy_static::lazy_static;
 use redis::AsyncCommands;
+use regex::Regex;
+use serde::{Deserialize, Serialize};
+
+lazy_static! {
+    static ref INDEX_RE: Regex = Regex::new(r"(?s)\+\+\+INDEX\+\+\+\n(.*?)\n---INDEX---").unwrap();
+}
 
 #[derive(Debug, Clone)]
 pub struct State {
     name: String,
     client: redis::Client,
     access_code: String,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct Page {
+    pub content: String,
+    pub index: String,
 }
 
 impl State {
@@ -61,15 +74,18 @@ impl State {
         Key::from(&master_bytes)
     }
 
-    pub async fn get_page(&self, path: &str) -> Option<String> {
-        self.con()
+    pub async fn get_page(&self, path: &str) -> Option<Page> {
+        let page_json: Option<String> = self
+            .con()
             .await
             .get(format!("page/{}", path))
             .await
-            .unwrap()
+            .unwrap();
+
+        page_json.map(|p| serde_json::from_str(&p).unwrap())
     }
 
-    pub async fn set_page(&self, path: &str, md: &str) {
+    pub async fn set_page(&self, path: &str, mut md: String) {
         let arena = Arena::new();
         let opts = ComrakOptions {
             extension: ComrakExtensionOptions {
@@ -79,10 +95,7 @@ impl State {
                 autolink: true,
                 tasklist: true,
                 superscript: true,
-                header_ids: Some("header-".to_owned()),
-                footnotes: true,
-                description_lists: true,
-                front_matter_delimiter: None,
+                ..Default::default()
             },
             parse: ComrakParseOptions::default(),
             render: ComrakRenderOptions {
@@ -91,32 +104,45 @@ impl State {
             },
         };
 
-        let root = comrak::parse_document(&arena, md, &opts);
-        iter_md_nodes(root, &|n| {
-            match &mut n.data.borrow_mut().value {
-                &mut NodeValue::Link(ref mut link) => {
-                    if link.url.starts_with("/") {
-                        link.url.insert_str(0, "/w");
-                    }
-                },
-                _ => (),
+        let mut page = Page::default();
+
+        if let Some(index_match) = INDEX_RE.captures(&md) {
+            page.index.push_str(&comrak::markdown_to_html(
+                index_match.get(1).unwrap().as_str(),
+                &opts,
+            ));
+            md.replace_range(index_match.get(0).unwrap().range(), "");
+        }
+
+        let root = comrak::parse_document(&arena, &md, &opts);
+        iter_md_nodes(root, &|n| match &mut n.data.borrow_mut().value {
+            &mut NodeValue::Link(ref mut link) => {
+                if link.url.starts_with("/") {
+                    link.url.insert_str(0, "/w");
+                }
             }
+            _ => (),
         });
 
         let mut html = Vec::new();
         comrak::format_html(root, &opts, &mut html).unwrap();
-        let html = String::from_utf8(html).unwrap();
+        page.content.push_str(&String::from_utf8(html).unwrap());
 
         self.con()
             .await
-            .set(format!("page/{}", path), &html)
+            .set(
+                format!("page/{}", path),
+                &serde_json::to_string(&page).unwrap(),
+            )
             .await
             .unwrap()
     }
 }
 
 fn iter_md_nodes<'a, F>(node: &'a AstNode<'a>, f: &F)
-    where F : Fn(&'a AstNode<'a>) {
+where
+    F: Fn(&'a AstNode<'a>),
+{
     f(node);
     for c in node.children() {
         iter_md_nodes(c, f);
