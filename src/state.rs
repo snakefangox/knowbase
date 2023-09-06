@@ -95,6 +95,7 @@ impl State {
                 autolink: true,
                 tasklist: true,
                 superscript: true,
+                header_ids: Some(String::new()),
                 ..Default::default()
             },
             parse: ComrakParseOptions::default(),
