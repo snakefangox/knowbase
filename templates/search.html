@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}{{ name }} - {{ search }}{% endblock title %}
+
+{% block body %}
+<main class="container-lg">
+  <div class="row align-items-start">
+    <div class="col shadow-lg px-4">
+      {% if results.is_empty() %}
+      <h2>No results found</h2>
+      {% else %}
+      {% for result in results %}
+      <div class="mb-3">
+        <h3 class="mt-3"><a href="{{ result.url }}">{{ result.title|capitalize }}</a></h3>
+        {{ result.preview }}
+        <hr>
+      </div>
+      {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+</main>
+{% endblock body %}

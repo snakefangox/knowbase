@@ -12,7 +12,7 @@ use actix_web::{
 };
 use askama_actix::Template;
 use serde::Deserialize;
-use state::{State, Page};
+use state::{Page, SearchResult, State};
 
 #[derive(Template)]
 #[template(path = "index.html")]
@@ -177,6 +177,43 @@ async fn wiki(
     .respond_to(&req))
 }
 
+#[derive(Template)]
+#[template(path = "search.html")]
+struct SearchTemplate<'a> {
+    name: &'a str,
+    search: &'a str,
+    results: Vec<SearchResult>,
+}
+
+#[derive(Deserialize)]
+struct SearchForm {
+    query: String,
+}
+
+#[post("/search")]
+async fn search(
+    req: HttpRequest,
+    session: Session,
+    state: Data<State>,
+    form: Form<SearchForm>,
+) -> Result<impl Responder> {
+    let authed = session.get::<bool>("auth")?;
+    if authed.is_none() || !authed.unwrap() {
+        return Ok(HttpResponse::SeeOther()
+            .append_header(("Location", "/"))
+            .body(()));
+    }
+
+    let results = state.run_search(&form.query).await;
+
+    Ok(SearchTemplate {
+        name: state.name(),
+        search: &form.query,
+        results,
+    }
+    .respond_to(&req))
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let state = State::new();
@@ -194,6 +231,7 @@ async fn main() -> std::io::Result<()> {
             .service(index)
             .service(login)
             .service(wiki)
+            .service(search)
             .service(favicon)
             .service(upload_page)
             .service(upload_file)

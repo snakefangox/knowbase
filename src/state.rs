@@ -8,6 +8,8 @@ use redis::AsyncCommands;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
+const PAGE_KEY: &str = "pages";
+
 lazy_static! {
     static ref INDEX_RE: Regex = Regex::new(r"(?s)\+\+\+INDEX\+\+\+\n(.*?)\n---INDEX---").unwrap();
 }
@@ -23,6 +25,14 @@ pub struct State {
 pub struct Page {
     pub content: String,
     pub index: String,
+    pub preview: String,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct SearchResult {
+    pub title: String,
+    pub url: String,
+    pub preview: String,
 }
 
 impl State {
@@ -75,12 +85,7 @@ impl State {
     }
 
     pub async fn get_page(&self, path: &str) -> Option<Page> {
-        let page_json: Option<String> = self
-            .con()
-            .await
-            .get(format!("page/{}", path))
-            .await
-            .unwrap();
+        let page_json: Option<String> = self.con().await.hget(PAGE_KEY, path).await.unwrap();
 
         page_json.map(|p| serde_json::from_str(&p).unwrap())
     }
@@ -125,18 +130,67 @@ impl State {
             _ => (),
         });
 
+        let mut preview_len = md.len().min(500);
+        while !md.is_char_boundary(preview_len) {
+            preview_len += 1;
+        }
+
+        page.preview = md[0..preview_len].to_owned();
+
         let mut html = Vec::new();
         comrak::format_html(root, &opts, &mut html).unwrap();
         page.content.push_str(&String::from_utf8(html).unwrap());
 
         self.con()
             .await
-            .set(
-                format!("page/{}", path),
-                &serde_json::to_string(&page).unwrap(),
-            )
+            .hset::<&str, &str, String, ()>(PAGE_KEY, path, serde_json::to_string(&page).unwrap())
             .await
-            .unwrap()
+            .unwrap();
+    }
+
+    pub async fn run_search(&self, search: &str) -> Vec<SearchResult> {
+        let search = search.to_lowercase();
+        let mut con = self.con().await;
+        let mut async_iter = con
+            .hscan_match::<&str, String, Vec<String>>(PAGE_KEY, format!("*{}*", search))
+            .await
+            .unwrap();
+        let mut matches: Vec<String> = Vec::new();
+
+        let mut items = async_iter.next_item().await;
+        while items.is_some() {
+            matches.append(&mut items.unwrap());
+            items = async_iter.next_item().await;
+        }
+
+        let mut results: Vec<SearchResult> = matches
+            .chunks(2)
+            .map(|a| (a[0].to_owned(), &a[1]))
+            .map(|(key, val)| {
+                let last_slash = key.split('/').last();
+                let title = if last_slash.is_some() {
+                    last_slash.unwrap().to_owned()
+                } else {
+                    key.to_owned()
+                };
+
+                let page: Page = serde_json::from_str(val).unwrap();
+                let title = title.trim_end_matches(".md").replace("-", " ");
+
+                SearchResult {
+                    title,
+                    url: format!("w/{}", key),
+                    preview: page.preview,
+                }
+            })
+            .collect();
+
+        results.sort_by(|a, b| {
+            strsim::jaro_winkler(&b.title, &search)
+                .total_cmp(&strsim::jaro_winkler(&a.title, &search))
+        });
+
+        results
     }
 }
 
