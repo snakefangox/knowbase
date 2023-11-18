@@ -170,7 +170,7 @@ async fn wiki(
     let page = state.get_page(trimmed_path).await.unwrap_or_default();
 
     Ok(WikiTemplate {
-        name: state.name(),
+        name: ,
         title: "Wiki",
         page: &page,
     }

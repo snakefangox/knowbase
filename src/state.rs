@@ -37,11 +37,11 @@ pub struct SearchResult {
 
 impl State {
     pub fn new() -> Self {
-        let name = std::env::var("OVERMIND_NAME").unwrap_or("Overmind".to_owned());
+        let name = std::env::var("knowbase_NAME").unwrap_or("knowbase".to_owned());
         let access_code =
-            std::env::var("OVERMIND_ACCESS_CODE").expect("OVERMIND_ACCESS_CODE should be set");
+            std::env::var("knowbase_ACCESS_CODE").expect("knowbase_ACCESS_CODE should be set");
         let client = redis::Client::open(
-            std::env::var("OVERMIND_REDIS_URL").expect("OVERMIND_REDIS_URL should be set"),
+            std::env::var("knowbase_REDIS_URL").expect("knowbase_REDIS_URL should be set"),
         )
         .expect("Redis URL should be valid");
 
